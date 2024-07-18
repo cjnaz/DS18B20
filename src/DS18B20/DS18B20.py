@@ -8,14 +8,16 @@ References:
     http://blog.foool.net/wp-content/uploads/linuxdocs/w1.pdf
 
 This module implements a mostly complete interface to the DS18B20 temperature sensor using the w1_therm kernel driver.
-Supports
-    Bulk parallel coversion of temperatures for all sensors on the bus
+Supports:
+    Reading temperatures
+    Bulk parallel conversion of temperatures for all sensors on the bus
     Resolution setting and Alarm threshold setting in scratchpad
     Scratchpad save/restore to/from EEPROM
     Multiple w1 busses
+    ** Alarm search (pending, if I only knew how)
 
 Does not support
-    alarm search (if I only knew how)
+    Alarm search (if I only knew how)
     setting conversion time (defaults to w1_therm set values based on resolution)
     async_io (just needs development)
     Other sensor models
@@ -34,21 +36,16 @@ Should work on similar kernel versions since about 2020.
 #   
 #==========================================================
 
-# __version__ = "V1.0 240715"
-
 import os
 import logging
 from pathlib import Path
-# import importlib.metadata
-# __version__ = importlib.metadata.version(__package__ or __name__)
-
 
 READ_ERROR =    -256
 CRC_ERROR =     -255
 ALARM_MIN =     -55
 ALARM_MAX =     125
+w1_root_path =  Path('/sys/bus/w1/devices/')
 
-w1_root_path = Path('/sys/bus/w1/devices/')
 
 class DS18B20:
     def __init__(self, device_id, device_name='DS18B20'):
@@ -89,7 +86,7 @@ class DS18B20:
             return CRC_ERROR
         
         try:
-            temp = w1_slave.split('\n')[1][-5:]
+            temp = w1_slave.split('\n')[1].split('t=')[1]
             temp = float(temp) / 1000
         except Exception as e:
             logging.debug(f"{self.device_id} / {self.device_name} - failed extracting temperature from w1_slave.\n  {e}")
@@ -97,7 +94,7 @@ class DS18B20:
 
         temp = convert_T(temp, tempunits)
 
-        logging.debug (f"{self.device_id} / {self.device_name} - temperature:  {temp:6.3f} {tempunits}")
+        logging.debug (f"{self.device_id} / {self.device_name} - temperature:  {temp:7.3f} {tempunits}")
         return temp
 
 
@@ -130,7 +127,7 @@ class DS18B20:
 
         temp = convert_T(temp, tempunits)
 
-        logging.debug (f"{self.device_id} / {self.device_name} - temperature:  {temp:6.3f} {tempunits}")
+        logging.debug (f"{self.device_id} / {self.device_name} - temperature:  {temp:7.3f} {tempunits}")
         return temp
 
 
@@ -158,19 +155,16 @@ class DS18B20:
         msB = int(line[1], base=16)
         lsB = int(line[0], base=16)
         temp_bytes = ((msB & 0x07) << 8) + lsB
-        tempC = temp_bytes-128  if temp_bytes & 0x8000  else temp_bytes / 16
-        # tempC = (((msB & 0x07) << 8) + lsB) / 16
-        # if msB & 0x80:                                      # If sign bit is set...
-        #     tempC -= 128.0      # TODO validate
-        logging.debug (f"{self.device_id} / {self.device_name} - temperature code:  {line[1]} {line[0]}  {tempC:6.3f} C,  {convert_T(tempC, 'F'):6.3f} F,  {convert_T(tempC, 'K'):6.3f} K")
+        tempC = (float(temp_bytes)/16-128)  if msB & 0x80  else (temp_bytes/16)
+        logging.debug (f"{self.device_id} / {self.device_name} - temperature code:  {line[1]} {line[0]}  {tempC:7.3f} C,  {convert_T(tempC, 'F'):7.3f} F,  {convert_T(tempC, 'K'):7.3f} K")
 
         # Decode TH and TL bytes 2 and 3
         TH_byte = int(line[2], base=16)
         TH = -(TL_byte & 0x7f)-128  if TH_byte & 0x80  else TH_byte
-        logging.debug (f"{self.device_id} / {self.device_name} - High alarm limit:  {line[2]}    {TH:3} C,     {convert_T(TH, 'F'):7.3f} F,  {convert_T(TH, 'K'):7.3f} K")
+        logging.debug (f"{self.device_id} / {self.device_name} - High alarm limit:  {line[2]}     {TH:3} C,      {convert_T(TH, 'F'):7.3f} F,  {convert_T(TH, 'K'):7.3f} K")
         TL_byte = int(line[3], base=16)
         TL = (TL_byte & 0x7f)-128  if TL_byte & 0x80  else TL_byte
-        logging.debug (f"{self.device_id} / {self.device_name} - Low  alarm limit:  {line[3]}    {TL:3} C,     {convert_T(TL, 'F'):7.3f} F,  {convert_T(TL, 'K'):7.3f} K")
+        logging.debug (f"{self.device_id} / {self.device_name} - Low  alarm limit:  {line[3]}     {TL:3} C,      {convert_T(TL, 'F'):7.3f} F,  {convert_T(TL, 'K'):7.3f} K")
 
         # Decode resolution code from config register
         resolution = (int(line[4], base=16) >> 5) + 9
@@ -222,15 +216,15 @@ class DS18B20:
         try:
             TL = int(TL)
         except:
-            raise ValueError ("alarm temps must be int or str values between -55 and 125.  Values are degrees C.")
+            raise ValueError (f"alarm temps must be int or str values between {ALARM_MIN} and {ALARM_MAX}.  Values are degrees C.")
         if TL < ALARM_MIN or TL > ALARM_MAX:
-            raise ValueError ("alarm temps must be int or str values between -55 and 125.  Values are degrees C.")
+            raise ValueError (f"alarm temps must be int or str values between {ALARM_MIN} and {ALARM_MAX}.  Values are degrees C.")
         try:
             TH = int(TH)
         except:
-            raise ValueError ("alarm temps must be int or str values between -55 and 125.  Values are degrees C.")
+            raise ValueError (f"alarm temps must be int or str values between {ALARM_MIN} and {ALARM_MAX}.  Values are degrees C.")
         if TH < ALARM_MIN or TH > ALARM_MAX:
-            raise ValueError ("alarm temps must be int or str values between -55 and 125.  Values are degrees C.")
+            raise ValueError (f"alarm temps must be int or str values between {ALARM_MIN} and {ALARM_MAX}.  Values are degrees C.")
         alarm_temps = f"{str(TL)} {str(TH)}"
         (self.sensor_path / 'alarms').write_text(alarm_temps)
         return self.get_alarm_temps()
@@ -255,7 +249,9 @@ class DS18B20:
 
 
     def bulk_convert_trigger(self):
-        """Trigger parallel temp coversions for all sensors on this sensor's bus.  Requires root privilege (sudo).
+        """Trigger parallel temp coversions for all sensors on this sensor's bus.
+        
+        Requires root privilege (sudo), or <chmod 666 /sys/bus/w1/devices/w1_bus_masterX/therm_bulk_read>.
 
         Follow with calls to <sensor>.read_temperature2() for each sensor on the bus.
 
@@ -281,10 +277,8 @@ class DS18B20:
 
         therm_bulk_read_reg = self.bus_master_path / 'therm_bulk_read'
         therm_bulk_read_reg.write_text('trigger\n')
+        logging.debug ("therm_bulk_read triggered")
         return self.bulk_convert_status()
-        # status = int(therm_bulk_read_reg.read_text()[:-1])
-        # logging.debug (f"therm_bulk_read status  {status}")
-        # return status
 
 
     def bulk_convert_status(self):
@@ -312,18 +306,19 @@ def convert_T(tempC, units):
         raise ValueError(f"Temperature units must be C, F, or K.  Received <{units}> ")
 
 
-# if __name__ == '__main__': 
 def cli():
 
     import time
     import argparse
     import datetime
+    import sys
     import importlib.metadata
     __version__ = importlib.metadata.version(__package__ or __name__)
 
     desc = """DS18B20 driver and CLI/demo for Raspberry Pi
 
 Modes:
+    0:  Dump info for all sensors (-m 0)  (DeviceID is a dummy placeholder)
     1:  Get current temp (-m 1)
     2:  Read scratchpad (-m 2)
     3:  Get current resolution (-m 3)
@@ -340,7 +335,7 @@ Modes:
     DEFAULT_NAME = "DS18B20"
 
     parser = argparse.ArgumentParser(description=desc + __version__, formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument('DeviceID',
+    parser.add_argument('DeviceID', nargs='?', default='NOT-SPECIFIED',
                         help=f"ID of target device, eg 28-0b2280337113")
     parser.add_argument('-m', '--mode', type=int, default=-1,
                         help=f"Test mode select (default 1)")
@@ -355,10 +350,19 @@ Modes:
 
     parser.add_argument('-v', '--verbose', action='count', default=0,
                         help="Print status and activity messages (-vv for debug level logging)")
-    # parser.add_argument('-V', '--version', action='version', version=f"{__name__} {__version__}",
     parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + __version__,
                         help="Print version number and exit")
     args = parser.parse_args()
+
+
+    if args.mode == 0:                      # Dump info for all sensors (-m 0)  (DeviceID is a dummy placeholder)
+        logging.getLogger().setLevel(logging.DEBUG)
+        sensor_list = sorted(w1_root_path.glob('28*'))
+        for sens in sensor_list:
+            sensor = DS18B20(sens.stem)
+            sensor.read_scratchpad()
+        sys.exit()
+
 
     if args.verbose == 0:
         logging.getLogger().setLevel(logging.WARNING)
@@ -367,19 +371,18 @@ Modes:
     if args.verbose > 1:
         logging.getLogger().setLevel(logging.DEBUG)
 
-
     sensor = DS18B20(args.DeviceID, args.name)
 
     if args.mode == 1:                      # Get current temp (-m 1)
         start_dt = datetime.datetime.now()
         temp = sensor.read_temperature()
-        logging.info (f"{temp} C from read_temperature()  Elapsed time  {(datetime.datetime.now() - start_dt).total_seconds()}\n")
+        logging.info (f"<{temp}> C from read_temperature()  Elapsed time  {(datetime.datetime.now() - start_dt).total_seconds()}\n")
         temp = sensor.read_temperature(tempunits='F')
-        logging.info (f"{temp} F from read_temperature()  Elapsed time  {(datetime.datetime.now() - start_dt).total_seconds()}\n")
+        logging.info (f"<{temp}> F from read_temperature()  Elapsed time  {(datetime.datetime.now() - start_dt).total_seconds()}\n")
         temp = sensor.read_temperature(tempunits='K')
-        logging.info (f"{temp} K from read_temperature()  Elapsed time  {(datetime.datetime.now() - start_dt).total_seconds()}\n")
+        logging.info (f"<{temp}> K from read_temperature()  Elapsed time  {(datetime.datetime.now() - start_dt).total_seconds()}\n")
         temp = sensor.read_temperature2()
-        logging.info (f"{temp} C from read_temperature2()   Elapsed time  {(datetime.datetime.now() - start_dt).total_seconds()}\n")
+        logging.info (f"<{temp}> C from read_temperature2()   Elapsed time  {(datetime.datetime.now() - start_dt).total_seconds()}\n")
 
     if args.mode == 2:                      # Read scratchpad (-m 2)
         logging.info (sensor.read_scratchpad())
@@ -426,22 +429,26 @@ Modes:
         time.sleep(1)
         sensor.read_scratchpad()
 
+        logging.info ("\n\nReset to alarms 15 60 and resolution 12, save to EEPROM")
+        sensor.set_alarm_temps(15, 60)
+        sensor.set_resolution(12)
+        sensor.copy_scratchpad()
+
+
     if args.mode == 11:                     # Demonstrate bulk/parallel temperature conversions and sensor reads (-m 11)
-        sensor_C = DS18B20(device_id='28-0b228004203c', device_name='sensor_C')
-        sensor_3 = DS18B20(device_id='28-0b2280337113', device_name='sensor_3')
+
+        slaves_on_this_bus = ((sensor.bus_master_path / 'w1_master_slaves').read_text()).split('\n')[:-1]   # Throw away last entry blank line
+        print (f"Slaves on this bus: {slaves_on_this_bus}")
 
         start_dt = datetime.datetime.now()
-        sensor_3.bulk_convert_trigger()
-        logging.info (f"Elapsed time after bulk_convert_trigger:                  {(datetime.datetime.now() - start_dt).total_seconds()}\n")
+        sensor.bulk_convert_trigger()
+        logging.info (f"Elapsed time after bulk_convert_trigger:                     {(datetime.datetime.now() - start_dt).total_seconds()}\n")
 
-        logging.info (sensor_3.read_temperature2())
-        logging.info (f"Elapsed time after sensor_3 read:                         {(datetime.datetime.now() - start_dt).total_seconds()}")
-        logging.info (f"Expecting <1> since sensor_C has not yet been read:       {sensor_3.bulk_convert_status()}\n")
-
-        logging.info (sensor_C.read_temperature2())
-        logging.info (f"Elapsed time after sensor_C read:                         {(datetime.datetime.now() - start_dt).total_seconds()}")
-        logging.info (f"Expecting <0> since all sensors have been read:           {sensor_3.bulk_convert_status()}")        # 0 since all sensors have been read
-        logging.info (f"Expecting <0> as any sensor on this bus may be checked:   {sensor_C.bulk_convert_status()}")        # Any sensor on this bus may be checked
+        for slave in slaves_on_this_bus:
+            _sensor = DS18B20(slave)
+            logging.info (_sensor.read_temperature2())
+            logging.info (f"Elapsed time after {slave} read:                     {(datetime.datetime.now() - start_dt).total_seconds()}")
+            logging.info (f"Expecting <1> until last sensor read:                        {_sensor.bulk_convert_status()}\n")
 
 
 if __name__ == '__main__':
