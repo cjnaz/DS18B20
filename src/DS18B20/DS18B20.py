@@ -168,7 +168,7 @@ class DS18B20:
 
         # Decode resolution code from config register
         resolution = (int(line[4], base=16) >> 5) + 9
-        logging.debug (f"{self.device_id} / {self.device_name} - Resolution:        {line[4]}     {resolution}")
+        logging.debug (f"{self.device_id} / {self.device_name} - Resolution:        {line[4]}      {resolution}")
 
         return line
 
@@ -318,7 +318,7 @@ def cli():
     desc = """DS18B20 driver and CLI/demo for Raspberry Pi
 
 Modes:
-    0:  Dump info for all sensors (-m 0)  (DeviceID is a dummy placeholder)
+    0:  Dump info for all sensors (-m 0)  (DeviceID is optional, don't care)
     1:  Get current temp (-m 1)
     2:  Read scratchpad (-m 2)
     3:  Get current resolution (-m 3)
@@ -337,8 +337,8 @@ Modes:
     parser = argparse.ArgumentParser(description=desc + __version__, formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('DeviceID', nargs='?', default='NOT-SPECIFIED',
                         help=f"ID of target device, eg 28-0b2280337113")
-    parser.add_argument('-m', '--mode', type=int, default=-1,
-                        help=f"Test mode select (default 1)")
+    parser.add_argument('-m', '--mode', type=int, default=-0,
+                        help=f"Test mode select (default 0)")
     parser.add_argument('-n', '--name', type=str, default=DEFAULT_NAME,
                         help=f"Name of the sensor to be displayed (default {DEFAULT_NAME})")
     parser.add_argument('-r', '--resolution', type=int, default=12,
@@ -349,26 +349,25 @@ Modes:
                         help=f"TH alarm value (degrees C) to be set with --mode 6 (default 50)")
 
     parser.add_argument('-v', '--verbose', action='count', default=0,
-                        help="Print status and activity messages (-vv for debug level logging)")
+                        help="Print debug-level status and activity messages")
     parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + __version__,
                         help="Print version number and exit")
     args = parser.parse_args()
 
 
-    if args.mode == 0:                      # Dump info for all sensors (-m 0)  (DeviceID is a dummy placeholder)
+    if args.mode == 0:                      # Dump info for all sensors (-m 0)  (DeviceID is optional, don't care)
         logging.getLogger().setLevel(logging.DEBUG)
         sensor_list = sorted(w1_root_path.glob('28*'))
         for sens in sensor_list:
             sensor = DS18B20(sens.stem)
+            logging.debug (f"\nSensor <{sens}> on bus master <{sensor.bus_master_path}>:")
             sensor.read_scratchpad()
         sys.exit()
 
 
     if args.verbose == 0:
-        logging.getLogger().setLevel(logging.WARNING)
-    elif args.verbose == 1:
         logging.getLogger().setLevel(logging.INFO)
-    if args.verbose > 1:
+    elif args.verbose == 1:
         logging.getLogger().setLevel(logging.DEBUG)
 
     sensor = DS18B20(args.DeviceID, args.name)
