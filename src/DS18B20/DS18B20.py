@@ -5,7 +5,7 @@ References:
     https://www.analog.com/media/en/technical-documentation/data-sheets/DS18B20.pdf
     https://docs.kernel.org/w1/slaves/w1_therm.html
 	https://docs.kernel.org/w1/w1-generic.html
-    http://blog.foool.net/wp-content/uploads/linuxdocs/w1.pdf
+
 
 This module implements a mostly complete interface to the DS18B20 temperature sensor using the w1_therm kernel driver.
 Supports:
@@ -22,7 +22,7 @@ Does not support
     async_io (just needs development)
     Other sensor models
 
-Tested on kernal version 6.1.21-v7+ #1642 SMP Mon Apr  3 17:20:52 BST 2023.
+Tested on kernel version 6.1.21-v7+ #1642 SMP Mon Apr  3 17:20:52 BST 2023.
 Should work on similar kernel versions since about 2020.
 """
 
@@ -37,6 +37,7 @@ Should work on similar kernel versions since about 2020.
 #==========================================================
 
 import os
+import sys
 import logging
 from pathlib import Path
 
@@ -47,29 +48,66 @@ ALARM_MAX =     125
 w1_root_path =  Path('/sys/bus/w1/devices/')
 
 
-class DS18B20:
-    def __init__(self, device_id, device_name='DS18B20'):
-        """Instantiate a sensor.
+#=====================================================================================
+#=====================================================================================
+#  C l a s s   D S 1 8 B 2 0
+#=====================================================================================
+#=====================================================================================
 
-        device_id       as listed in /sys/bus/w1/devices/
-        device_name     User friendly name for the sensor
-        """
+class DS18B20:
+    """
+## Class DS18B20 (device_id, device_name='DS18B20') - DS18B20 library/driver for Raspberry Pi using the w1_therm kernel driver
+
+### Parameters
+`device_id`
+- As listed in /sys/bus/w1/devices/, eg '28-0b228004203c'
+
+`device_name` (default 'DS18B20')
+- User friendly name for the sensor
+
+### Class variables
+
+`device_id`
+- device_id from sensor instantiation
+
+`device_name` (default 'DS18B20')
+- device_name from sensor instantiation
+
+`sensor_path`
+- full pathlib path to the sensor directory
+
+`bus_master_path`
+- full pathlib path the w1 bus master for the sensor
+
+    """
+    def __init__(self, device_id, device_name='DS18B20'):
         self.device_id =        device_id
         self.device_name =      device_name
         self.sensor_path =      w1_root_path / device_id
         self.bus_master_path =  w1_root_path / (os.readlink(self.sensor_path).replace('../../../devices/', '').split('/')[0])
 
 
-    def read_temperature(self, tempunits='C'):
-        """Return the temperature from w1_slave file, with CRC check.
-        
-        tempunits must be 'C', 'F' or 'K', else ValueError is raised.
+#=====================================================================================
+#=====================================================================================
+#  r e a d _ t e m p e r a t u r e
+#=====================================================================================
+#=====================================================================================
 
-        Returns
-            Read temperature in tempunits as a float
-            -255:  CRC_ERROR
-            -256:  READ_ERROR
-            ValueError exception if tempunits is not valid
+    def read_temperature(self, tempunits='C'):
+        """
+## read_temperature (tempunits='C') - Return the temperature from w1_slave file, with CRC check
+
+***DS18B20() class member function***
+
+### Parameter
+`tempunits` (default 'C')
+- Must be 'C', 'F' or 'K', else ValueError is raised.
+
+### Returns
+- Read temperature in tempunits as a float
+- -255:  CRC_ERROR
+- -256:  READ_ERROR
+- Raises `ValueError` if tempunits is not valid
         """
 
         try:
@@ -98,18 +136,29 @@ class DS18B20:
         return temp
 
 
+#=====================================================================================
+#=====================================================================================
+#  r e a d _ t e m p e r a t u r e 2
+#=====================================================================================
+#=====================================================================================
+
     def read_temperature2(self, tempunits='C'):
-        """Return the temperature from temperature file.  Used with bulk_convert_trigger().
+        """
+## read_temperature2 (tempunits='C') - Return the temperature from temperature file.  Used with bulk_convert_trigger().
 
-        tempunits must be 'C', 'F' or 'K', else ValueError is raised.
+***DS18B20() class member function***
 
-        If a bulk_convert_trigger() was previously executed, return the previously captured temperature, else take
-        and return a new measurement.
+If a bulk_convert_trigger() was previously executed, return the previously captured temperature, else take
+and return a new measurement.
 
-        Returns
-            Read temperature in tempunits as a float
-            -256:  READ_ERROR
-            ValueError exception if tempunits is not valid        
+### Parameter
+`tempunits` (default 'C')
+- Must be 'C', 'F' or 'K', else ValueError is raised.
+
+### Returns
+- Read temperature in tempunits as a float
+- -256:  READ_ERROR
+- Raises `ValueError` if tempunits is not valid
         """
 
         try:
@@ -131,14 +180,23 @@ class DS18B20:
         return temp
 
 
+#=====================================================================================
+#=====================================================================================
+#  r e a d _ s c r a t c h p a d
+#=====================================================================================
+#=====================================================================================
+
     def read_scratchpad(self):
-        """Return the w1_slave file line 1.  Forces a new temperature conversion.
+        """
+## read_scratchpad () - Return the w1_slave file line 1.  Forces a new temperature conversion.
 
-        With debug logging, logs full w1_slave file, temperature (bytes 0 & 1), TH and TL (bytes 2 & 3), and resolution in the config register (byte 4).
+***DS18B20() class member function***
 
-        Returns
-            Just line 1 (9 bytes and CRC calc/confirmation) from the w1_slave file (not the second line which include 't=xxxxx')
-            -256:  READ_ERROR
+With debug logging, logs full w1_slave file, temperature (bytes 0 & 1), TH and TL (bytes 2 & 3), and resolution in the config register (byte 4).
+
+### Returns
+- Just line 1 (9 bytes and CRC calc/confirmation) from the w1_slave file (not the second line which include 't=xxxxx')
+- -256:  READ_ERROR
         """
         try:
             w1_slave_file = (self.sensor_path / 'w1_slave').read_text()
@@ -170,23 +228,51 @@ class DS18B20:
         resolution = (int(line[4], base=16) >> 5) + 9
         logging.debug (f"{self.device_id} / {self.device_name} - Resolution:        {line[4]}      {resolution}")
 
+        # Log paths
+        logging.debug (f"{self.device_id} / {self.device_name} - Sensor root directory:      {self.sensor_path}")
+        logging.debug (f"{self.device_id} / {self.device_name} - Bus master root directory:  {self.bus_master_path}")
+
         return line
 
 
+#=====================================================================================
+#=====================================================================================
+#  g e t _ r e s o l u t i o n
+#=====================================================================================
+#=====================================================================================
+
     def get_resolution(self):
-        """Return the current resolution setting in the config register as a str.
+        """
+## get_resolution () - Return the current resolution setting in the config register as a str
+
+***DS18B20() class member function***
+
+### Returns
+- Current resolution setting in the config register as a str, eg '12'
         """
         resolution = ((self.sensor_path / 'resolution')).read_text()[:-1]
         logging.debug (f"{self.device_id} / {self.device_name} - Current resolution setting:    {resolution}")
         return resolution
     
 
+#=====================================================================================
+#=====================================================================================
+#  s e t _ r e s o l u t i o n
+#=====================================================================================
+#=====================================================================================
+
     def set_resolution(self, resolution):
-        """Set the configuration register resolution field.  Requires root privilege (sudo).
+        """
+## set_resolution (resolution) - Set the configuration register resolution field.  Requires root privilege (sudo).
 
-        Resolution may be an int or str with the value of 9, 10, 11, or 12.
+***DS18B20() class member function***
 
-        Returns the set resolution as str                   
+### Parameter
+`resolution`
+- int or str with the value of 9, 10, 11, or 12
+
+### Returns
+- New resolution setting as a str, eg '12'
         """
         try:
             resolution = str(resolution)
@@ -198,21 +284,55 @@ class DS18B20:
         return self.get_resolution()
 
 
+#=====================================================================================
+#=====================================================================================
+#  g e t _ a l a r m _ t e m p s
+#=====================================================================================
+#=====================================================================================
+
     def get_alarm_temps(self):
-        """Return the current <TH TL> alarm settings as a str.
         """
+## get_alarm_temps () - Return the current <TH TL> alarm settings as a str
+
+***DS18B20() class member function***
+
+### Returns
+- Current <TL TH> alarm settings as a str, eg '-15 20'
+- Values are degrees C
+        """
+
         alarm_temps = ((self.sensor_path / 'alarms')).read_text()[:-1]
         logging.debug (f"{self.device_id} / {self.device_name} - Current alarm TL TH settings:  {alarm_temps}")
         return alarm_temps
     
 
+#=====================================================================================
+#=====================================================================================
+#  s e t _ a l a r m _ t e m p s
+#=====================================================================================
+#=====================================================================================
+
     def set_alarm_temps(self, TL, TH):
-        """Set the alarm TH and TL registers.  Requires root privilege (sudo).
-
-        Values must be between -55C and +125C.  w1_therm sets TL to the lower of the two temps, TH to the higher.
-
-        Returns the set <TH TL> pair as str
         """
+## set_alarm_temps (TL, TH) - Set the alarm TL and TH registers.  Requires root privilege (sudo).
+
+***DS18B20() class member function***
+
+Values must be between -55C and +125C.  w1_therm sets TL to the lower of the two temps, TH to the higher.
+
+### Parameters
+`TL`
+- Low temp alarm threshold in degrees C as an int or str
+
+`TH`
+- High temp alarm threshold in degrees C as an int or str
+
+### Returns
+- Returns the newly set <TL TH> pair as str
+- Raises `ValueError` if TL or TH value is not valid or out of range
+
+        """
+
         try:
             TL = int(TL)
         except:
@@ -230,35 +350,65 @@ class DS18B20:
         return self.get_alarm_temps()
 
 
-    def copy_scratchpad(self):
-        """write scratchpad TH, TL, and resolution to EEPROM.  Requires root privilege (sudo).
+#=====================================================================================
+#=====================================================================================
+#  c o p y _ s c r a t c h p a d
+#=====================================================================================
+#=====================================================================================
 
-        Returns None
+    def copy_scratchpad(self):
+        """
+## copy_scratchpad () - write scratchpad TH, TL, and resolution to EEPROM.  Requires root privilege (sudo).
+
+***DS18B20() class member function***
+
+### Returns
+- None
         """
         (self.sensor_path / 'eeprom_cmd').write_text('save\n')
         logging.debug (f"{self.device_id} / {self.device_name} - scratchpad saved to EEPROM")
     
 
-    def recall_E2(self):
-        """Restore EEPROM TH, TL, and resolution to scrachpad.  Requires root privilege (sudo).
+#=====================================================================================
+#=====================================================================================
+#  r e c a l l _ E 2
+#=====================================================================================
+#=====================================================================================
 
-        Returns None
+    def recall_E2(self):
+        """
+## recall_E2 () - Restore EEPROM TH, TL, and resolution to scratchpad.  Requires root privilege (sudo).
+
+***DS18B20() class member function***
+
+### Returns
+- None
         """
         (self.sensor_path / 'eeprom_cmd').write_text('restore\n')
         logging.debug (f"{self.device_id} / {self.device_name} - EEPROM restored to scratchpad")
 
 
+#=====================================================================================
+#=====================================================================================
+#  b u l k _ c o n v e r t _ t r i g g e r
+#=====================================================================================
+#=====================================================================================
+
     def bulk_convert_trigger(self):
-        """Trigger parallel temp coversions for all sensors on this sensor's bus.
-        
-        Requires root privilege (sudo), or <chmod 666 /sys/bus/w1/devices/w1_bus_masterX/therm_bulk_read>.
+        """
+## bulk_convert_trigger () - Trigger parallel temp conversions for all sensors on this sensor's bus.
 
-        Follow with calls to <sensor>.read_temperature2() for each sensor on the bus.
+***DS18B20() class member function***
 
-        Return 
-            int 1 on successful trigger.  Returns after the parallel conversion time of all sensors on the bus.
-            int 0 if trigger was not successful
-            int -1 if at least one sensor is still in conversion
+Requires root privilege (sudo), or <chmod 666 /sys/bus/w1/devices/w1_bus_masterX/therm_bulk_read>.
+Note that the chmod must be redone after each boot.
+
+Follow with calls to <sensor>.read_temperature2() for each sensor on the bus.
+
+### Returns
+- int 1 on successful trigger.  Returns after the parallel conversion time of all sensors on the bus.
+- int 0 if trigger was not successful
+- int -1 if at least one sensor is still in conversion
         """
         # http://blog.foool.net/wp-content/uploads/linuxdocs/w1.pdf
             # A bulk read of all devices on the bus could be done writing ‘trigger’in the
@@ -281,19 +431,34 @@ class DS18B20:
         return self.bulk_convert_status()
 
 
-    def bulk_convert_status(self):
-        """Return the status of bulk/parallel sensor conversions and reading on this sensor's bus.
+#=====================================================================================
+#=====================================================================================
+#  b u l k _ c o n v e r t _ s t a t u s
+#=====================================================================================
+#=====================================================================================
 
-        Return 
-            int 1 if any sensor on this sensor's bus has not yet be read with read_temperature2()
-            int 0 if all sensors on this sensor's bus have been read
-            int -1 if at least one sensor is still in conversion
+    def bulk_convert_status(self):
+        """
+## bulk_convert_status () - Return the status of bulk/parallel sensor conversions and reading on this sensor's bus.
+
+***DS18B20() class member function***
+
+### Returns
+- int 1 if any sensor on this sensor's bus has not yet be read with read_temperature2()
+- int 0 if all sensors on this sensor's bus have been read
+- int -1 if at least one sensor is still in conversion
         """
         therm_bulk_read_reg = self.bus_master_path / 'therm_bulk_read'
         status = int(therm_bulk_read_reg.read_text()[:-1])
         logging.debug (f"therm_bulk_read status  {status}")
         return status
 
+
+#=====================================================================================
+#=====================================================================================
+#  c o n v e r t _ T
+#=====================================================================================
+#=====================================================================================
 
 def convert_T(tempC, units):
     if units == 'C':
@@ -305,6 +470,12 @@ def convert_T(tempC, units):
     else:
         raise ValueError(f"Temperature units must be C, F, or K.  Received <{units}> ")
 
+
+#=====================================================================================
+#=====================================================================================
+#  c l i
+#=====================================================================================
+#=====================================================================================
 
 def cli():
 
@@ -330,6 +501,7 @@ Modes:
     9:  Restore EEPROM to scratchpad (-m 9)
     10: Demonstrate saving alarm/resolution to EEPROM and restoring (-m 10)
     11: Demonstrate bulk/parallel temperature conversions and sensor reads (-m 11)
+    20: Minimal example for README (-m 20)
 """
 
     DEFAULT_NAME = "DS18B20"
@@ -372,6 +544,7 @@ Modes:
 
     sensor = DS18B20(args.DeviceID, args.name)
 
+
     if args.mode == 1:                      # Get current temp (-m 1)
         start_dt = datetime.datetime.now()
         temp = sensor.read_temperature()
@@ -383,29 +556,38 @@ Modes:
         temp = sensor.read_temperature2()
         logging.info (f"<{temp}> C from read_temperature2()   Elapsed time  {(datetime.datetime.now() - start_dt).total_seconds()}\n")
 
+
     if args.mode == 2:                      # Read scratchpad (-m 2)
         logging.info (sensor.read_scratchpad())
+
 
     if args.mode == 3:                      # Get current resolution (-m 3)
         logging.info (sensor.get_resolution())
 
+
     if args.mode == 4:                      # Set resolution (-m 4 -r 9)
         logging.info (sensor.set_resolution(args.resolution))
+
 
     if args.mode == 5:                      # Get current alarm temps (-m 5)
         logging.info (sensor.get_alarm_temps())
 
+
     if args.mode == 6:                      # Set alarm temps (-m 6 -L 20 -H 30)
         logging.info (sensor.set_alarm_temps(args.TL, args.TH))
+
 
     if args.mode == 7:                      # Send bulk_convert_trigger (-m 7)
         logging.info (sensor.bulk_convert_trigger())
 
+
     if args.mode == 8:                      # Save scratchpad to EEPROM (-m 8)
         logging.info (sensor.copy_scratchpad())
 
+
     if args.mode == 9:                      # Restore EEPROM to scratchpad (-m 9)
         logging.info (sensor.recall_E2())
+
 
     if args.mode == 10:                     # Demonstrate saving alarm/resolution to EEPROM and restoring (-m 10)
         logging.info ("\n\nInitial state")
@@ -435,7 +617,6 @@ Modes:
 
 
     if args.mode == 11:                     # Demonstrate bulk/parallel temperature conversions and sensor reads (-m 11)
-
         slaves_on_this_bus = ((sensor.bus_master_path / 'w1_master_slaves').read_text()).split('\n')[:-1]   # Throw away last entry blank line
         print (f"Slaves on this bus: {slaves_on_this_bus}")
 
@@ -448,6 +629,11 @@ Modes:
             logging.info (_sensor.read_temperature2())
             logging.info (f"Elapsed time after {slave} read:                     {(datetime.datetime.now() - start_dt).total_seconds()}")
             logging.info (f"Expecting <1> until last sensor read:                        {_sensor.bulk_convert_status()}\n")
+
+
+    if args.mode == 20:                     # Minimal example for README
+        sensor = DS18B20(args.DeviceID, args.name)
+        logging.info (f"Current temperature for sensor {sensor.device_name} / {sensor.device_id}:  {sensor.read_temperature(tempunits='F'):7.3f} F")
 
 
 if __name__ == '__main__':
