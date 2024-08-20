@@ -14,12 +14,6 @@ import re
 
 modules = [
     {'outfile':'../README.md',     'head':'./DS18B20_head.md',         'source':'../src/DS18B20/DS18B20.py'},
-    # {'outfile':'../configman.md',   'head':'./configman_head.md',   'source':'../src/cjnfuncs/configman.py'},
-    # {'outfile':'../timevalue.md',   'head':'./timevalue_head.md',   'source':'../src/cjnfuncs/timevalue.py'},
-    # {'outfile':'../mungePath.md',   'head':'./mungePath_head.md',   'source':'../src/cjnfuncs/mungePath.py'},
-    # {'outfile':'../deployfiles.md', 'head':'./deployfiles_head.md', 'source':'../src/cjnfuncs/deployfiles.py'},
-    # {'outfile':'../resourcelock.md','head':'./resourcelock_head.md','source':'../src/cjnfuncs/resourcelock.py'},
-    # {'outfile':'../SMTP.md',        'head':'./SMTP_head.md',        'source':'../src/cjnfuncs/SMTP.py'},
 ]
 
 def main():
@@ -80,8 +74,6 @@ def build_links_list(source):
 def extract_docstrings(source):
     xx = ''
     all = pathlib.Path(source).read_text()
-
-    # xx += (links)
 
     for block in comment_block.finditer(all):
         link_name = get_linkname(block)

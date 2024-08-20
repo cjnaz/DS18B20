@@ -5,15 +5,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = 'DS18B20'
-version = "1.0"
+version = "1.1"
 description = "DS18B20 library/driver for Raspberry Pi using the w1_therm kernel driver"
 readme = "README.md"
-requires-python = ">=3.6"
+requires-python = ">=3.7"
 authors = [ {name = "Chris Nelson", email = "github@cjnaz.com"} ]
 license = {file = "LICENSE.txt"}
 dependencies = [
 #    'cjnfuncs >= 2.1b1',
-    'importlib-metadata; python_version<"3.8"',
+#   'importlib-metadata; python_version<"3.8"',
     ]
 classifiers = [                 # https://pypi.org/classifiers/
     "Topic :: Software Development :: Libraries :: Python Modules",
