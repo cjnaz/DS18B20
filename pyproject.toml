@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 
 [project]
-name = 'DS18B20'
+name = 'DS18B20-driver'
 version = "1.1"
 description = "DS18B20 library/driver for Raspberry Pi using the w1_therm kernel driver"
 readme = "README.md"
