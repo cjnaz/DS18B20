@@ -13,7 +13,7 @@ import re
 
 
 modules = [
-    {'outfile':'../README.md',     'head':'./DS18B20_head.md',         'source':'../src/DS18B20/DS18B20.py'},
+    {'outfile':'../README.md',     'head':'./DS18B20_head.md',         'source':'../src/DS18B20dvr/DS18B20.py'},
 ]
 
 def main():
