@@ -1,4 +1,7 @@
-# DS18B20 library/driver for Raspberry Pi using the w1_therm kernel driver
+# DS18B20 high-featured library/driver for Raspberry Pi using the w1_therm kernel driver
+
+**NOTE:  _This is the working version._  Pay no attention to the PyPI version named `DS18B20-driver 1.1.2`.  That version 
+is broken (package naming problems that lead to a broken install), and there's no way to delete it.**
 
 Skip to [API documentation](#links)
 
@@ -28,7 +31,7 @@ Do read the fine [datasheet](https://www.analog.com/media/en/technical-documenta
 
 ## Command Line Interface and Demo
 
-Once installed (pip install DS18B20), a cli tool is available.  The cli tool provides some useful debug and configuration features (such as setting and permanently saving 
+Once installed (pip install DS18B20dvr), a cli tool is available.  The cli tool provides some useful debug and configuration features (such as setting and permanently saving 
 the resolution setting), and also a few demonstration cases (such as triggering a bulk/parallel conversion on multiple sensors and reading back their values).
 
 ```
@@ -55,7 +58,7 @@ Modes:
     20: Minimal example for README (-m 20)
     21: Demonstrate saving alarm/resolution to EEPROM and restoring (-m 21)
     22: Demonstrate bulk/parallel temperature conversions and sensor reads (-m 22)
-1.1
+1.2
 
 positional arguments:
   DeviceID              ID of target device, eg 28-0b2280337113
